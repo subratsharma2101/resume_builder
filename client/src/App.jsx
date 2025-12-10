@@ -1,12 +1,15 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FileText, Upload, BarChart3, Palette, PenTool, Download,
   Sun, Moon, Menu, X, ChevronRight, Sparkles, Target,
   Zap, Shield, Users, Star, Github, Twitter, Linkedin,
   Mail, Phone, MapPin, Plus, Trash2, GripVertical, Eye,
   CheckCircle, AlertCircle, Info, ArrowRight, FileUp,
-  Briefcase, GraduationCap, Award, Code, Heart, Coffee
+  Briefcase, GraduationCap, Award, Code, Heart, Coffee,
+  Camera, Globe, Languages, FolderOpen, Image, Link2,
+  Move, Settings, Copy, ExternalLink, Lightbulb,
+  LogIn, LogOut, User, Lock, Chrome, FileDown
 } from 'lucide-react';
 import './index.css';
 
@@ -57,13 +60,15 @@ function ResumeProvider({ children }) {
       linkedin: '',
       location: '',
       website: '',
+      photo: '',
       summary: '',
       experience: [],
       education: [],
       skills: [],
       projects: [],
       certifications: [],
-      languages: []
+      languages: [],
+      awards: []
     };
   });
 
@@ -90,6 +95,128 @@ function ResumeProvider({ children }) {
     }}>
       {children}
     </ResumeContext.Provider>
+  );
+}
+
+// Auth Context
+const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [loading, setLoading] = useState(false);
+
+  const login = async (email, password) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (error) {
+      return { success: false, error: 'Login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (name, email, password) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (error) {
+      return { success: false, error: 'Registration failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (googleData) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(googleData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (error) {
+      return { success: false, error: 'Google login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGithub = async (githubData) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/github`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(githubData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (error) {
+      return { success: false, error: 'GitHub login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, loginWithGithub, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
@@ -471,7 +598,7 @@ function ATSScoreCircle({ score, size = 180 }) {
           cy={size / 2}
           r={radius}
           stroke={getScoreColor(score)}
-          strokeDasharray={`${progress} ${circumference}`}
+          strokeDasharray={`${progress} ${circumference} `}
         />
       </svg>
       <div className="ats-score-value">
@@ -511,7 +638,7 @@ function FileUpload({ onUpload, loading }) {
 
   return (
     <label
-      className={`upload-zone ${dragOver ? 'dragover' : ''}`}
+      className={`upload - zone ${dragOver ? 'dragover' : ''} `}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1361,9 +1488,10 @@ function BuilderPage() {
     experience: { visible: true, heading: 'Work Experience' },
     education: { visible: true, heading: 'Education' },
     skills: { visible: true, heading: 'Skills' },
-    certifications: { visible: false, heading: 'Certifications' },
-    projects: { visible: false, heading: 'Projects' },
-    languages: { visible: false, heading: 'Languages' }
+    projects: { visible: true, heading: 'Projects' },
+    certifications: { visible: true, heading: 'Certifications' },
+    languages: { visible: true, heading: 'Languages' },
+    awards: { visible: false, heading: 'Awards & Achievements' }
   });
 
   // Auto-generate professional summary based on resume data
@@ -1491,6 +1619,130 @@ function BuilderPage() {
     });
   };
 
+  // Projects handlers
+  const addProject = () => {
+    updateResumeData({
+      projects: [...(resumeData.projects || []), {
+        id: Date.now(),
+        name: '',
+        description: '',
+        technologies: '',
+        link: ''
+      }]
+    });
+  };
+
+  const updateProject = (id, field, value) => {
+    updateResumeData({
+      projects: resumeData.projects.map(proj =>
+        proj.id === id ? { ...proj, [field]: value } : proj
+      )
+    });
+  };
+
+  const removeProject = (id) => {
+    updateResumeData({
+      projects: resumeData.projects.filter(proj => proj.id !== id)
+    });
+  };
+
+  // Certifications handlers
+  const addCertification = () => {
+    updateResumeData({
+      certifications: [...(resumeData.certifications || []), {
+        id: Date.now(),
+        name: '',
+        issuer: '',
+        year: ''
+      }]
+    });
+  };
+
+  const updateCertification = (id, field, value) => {
+    updateResumeData({
+      certifications: resumeData.certifications.map(cert =>
+        cert.id === id ? { ...cert, [field]: value } : cert
+      )
+    });
+  };
+
+  const removeCertification = (id) => {
+    updateResumeData({
+      certifications: resumeData.certifications.filter(cert => cert.id !== id)
+    });
+  };
+
+  // Languages handlers
+  const [newLanguage, setNewLanguage] = useState({ name: '', level: 'Intermediate' });
+
+  const addLanguage = () => {
+    if (newLanguage.name.trim()) {
+      updateResumeData({
+        languages: [...(resumeData.languages || []), {
+          id: Date.now(),
+          name: newLanguage.name.trim(),
+          level: newLanguage.level
+        }]
+      });
+      setNewLanguage({ name: '', level: 'Intermediate' });
+    }
+  };
+
+  const removeLanguage = (id) => {
+    updateResumeData({
+      languages: resumeData.languages.filter(lang => lang.id !== id)
+    });
+  };
+
+  // Awards handlers
+  const addAward = () => {
+    updateResumeData({
+      awards: [...(resumeData.awards || []), {
+        id: Date.now(),
+        title: '',
+        issuer: '',
+        year: ''
+      }]
+    });
+  };
+
+  const updateAward = (id, field, value) => {
+    updateResumeData({
+      awards: resumeData.awards.map(award =>
+        award.id === id ? { ...award, [field]: value } : award
+      )
+    });
+  };
+
+  const removeAward = (id) => {
+    updateResumeData({
+      awards: resumeData.awards.filter(award => award.id !== id)
+    });
+  };
+
+  // Photo upload handler
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updateResumeData({ photo: event.target.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    updateResumeData({ photo: '' });
+  };
+
+  // Action verb suggestions
+  const actionVerbs = [
+    'Achieved', 'Built', 'Created', 'Delivered', 'Enhanced', 'Facilitated',
+    'Generated', 'Implemented', 'Led', 'Managed', 'Optimized', 'Pioneered',
+    'Reduced', 'Spearheaded', 'Transformed', 'Upgraded'
+  ];
+
   const exportToPDF = async () => {
     const html2pdf = (await import('html2pdf.js')).default;
     const element = document.getElementById('resume-preview');
@@ -1502,6 +1754,30 @@ function BuilderPage() {
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     }).from(element).save();
+  };
+
+  const exportToWord = async () => {
+    try {
+      const response = await fetch(`${API_URL}/export/word`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeData })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${resumeData.name || 'resume'}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }
+    } catch (error) {
+      console.error('Word export error:', error);
+    }
   };
 
   // Section Header Component with toggle and editable heading
@@ -1585,9 +1861,13 @@ function BuilderPage() {
                 <Target size={16} />
                 Settings
               </button>
+              <button className="btn btn-secondary btn-sm" onClick={exportToWord}>
+                <FileDown size={16} />
+                Word
+              </button>
               <button className="btn btn-primary btn-sm" onClick={exportToPDF}>
                 <Download size={16} />
-                Export PDF
+                PDF
               </button>
             </div>
           </div>
@@ -1659,6 +1939,70 @@ function BuilderPage() {
                 </h4>
               </div>
               <div className="editor-section-content">
+                {/* Photo Upload */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-lg)'
+                }}>
+                  <div style={{ position: 'relative' }}>
+                    {resumeData.photo ? (
+                      <img
+                        src={resumeData.photo}
+                        alt="Profile"
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '3px solid var(--primary-500)'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        background: 'var(--bg-secondary)',
+                        border: '2px dashed var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Camera size={28} style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Profile Photo</p>
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      Add a professional photo (optional)
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                        <Camera size={14} />
+                        {resumeData.photo ? 'Change' : 'Upload'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                      {resumeData.photo && (
+                        <button className="btn btn-ghost btn-sm" onClick={removePhoto}>
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="input-group">
                   <label className="input-label">Full Name</label>
                   <input
@@ -1941,6 +2285,260 @@ function BuilderPage() {
                       </span>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Projects */}
+            {sectionSettings.projects.visible && (
+              <div className="editor-section">
+                <SectionHeader sectionKey="projects" icon={<FolderOpen size={18} />} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 1rem', marginTop: '-0.5rem' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={addProject}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                <div className="editor-section-content">
+                  {resumeData.projects?.map((proj) => (
+                    <div key={proj.id} className="entry-card">
+                      <div className="entry-header">
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Project Name"
+                          value={proj.name}
+                          onChange={(e) => updateProject(proj.id, 'name', e.target.value)}
+                          style={{ fontWeight: '600', border: 'none', padding: 0, background: 'transparent' }}
+                        />
+                        <div className="entry-actions">
+                          <button
+                            className="entry-action-btn danger"
+                            onClick={() => removeProject(proj.id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Technologies used (e.g., React, Node.js)"
+                        value={proj.technologies}
+                        onChange={(e) => updateProject(proj.id, 'technologies', e.target.value)}
+                        style={{ marginBottom: '0.75rem' }}
+                      />
+                      <input
+                        type="url"
+                        className="input"
+                        placeholder="Project URL (optional)"
+                        value={proj.link}
+                        onChange={(e) => updateProject(proj.id, 'link', e.target.value)}
+                        style={{ marginBottom: '0.75rem' }}
+                      />
+                      <textarea
+                        className="input"
+                        placeholder="Describe the project and your role..."
+                        value={proj.description}
+                        onChange={(e) => updateProject(proj.id, 'description', e.target.value)}
+                        style={{ minHeight: '60px' }}
+                      />
+                    </div>
+                  ))}
+                  {(!resumeData.projects || resumeData.projects.length === 0) && (
+                    <button className="btn btn-secondary" onClick={addProject} style={{ width: '100%' }}>
+                      <Plus size={18} />
+                      Add Project
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Certifications */}
+            {sectionSettings.certifications.visible && (
+              <div className="editor-section">
+                <SectionHeader sectionKey="certifications" icon={<Award size={18} />} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 1rem', marginTop: '-0.5rem' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={addCertification}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                <div className="editor-section-content">
+                  {resumeData.certifications?.map((cert) => (
+                    <div key={cert.id} className="entry-card">
+                      <div className="entry-header">
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Certification Name"
+                          value={cert.name}
+                          onChange={(e) => updateCertification(cert.id, 'name', e.target.value)}
+                          style={{ fontWeight: '600', border: 'none', padding: 0, background: 'transparent' }}
+                        />
+                        <div className="entry-actions">
+                          <button
+                            className="entry-action-btn danger"
+                            onClick={() => removeCertification(cert.id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Issuing Organization"
+                          value={cert.issuer}
+                          onChange={(e) => updateCertification(cert.id, 'issuer', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Year"
+                          value={cert.year}
+                          onChange={(e) => updateCertification(cert.id, 'year', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {(!resumeData.certifications || resumeData.certifications.length === 0) && (
+                    <button className="btn btn-secondary" onClick={addCertification} style={{ width: '100%' }}>
+                      <Plus size={18} />
+                      Add Certification
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Languages */}
+            {sectionSettings.languages.visible && (
+              <div className="editor-section">
+                <SectionHeader sectionKey="languages" icon={<Globe size={18} />} />
+                <div className="editor-section-content">
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Language (e.g., English)"
+                      value={newLanguage.name}
+                      onChange={(e) => setNewLanguage({ ...newLanguage, name: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                    <select
+                      className="input"
+                      value={newLanguage.level}
+                      onChange={(e) => setNewLanguage({ ...newLanguage, level: e.target.value })}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value="Native">Native</option>
+                      <option value="Fluent">Fluent</option>
+                      <option value="Advanced">Advanced</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Basic">Basic</option>
+                    </select>
+                    <button className="btn btn-primary" onClick={addLanguage}>
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {resumeData.languages?.map((lang) => (
+                      <div key={lang.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.75rem',
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-color)'
+                      }}>
+                        <span style={{ fontWeight: '500' }}>{lang.name}</span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          padding: '0.125rem 0.5rem',
+                          background: 'var(--primary-100)',
+                          color: 'var(--primary-600)',
+                          borderRadius: 'var(--radius-sm)'
+                        }}>
+                          {lang.level}
+                        </span>
+                        <button
+                          onClick={() => removeLanguage(lang.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: '0.125rem'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Awards */}
+            {sectionSettings.awards?.visible && (
+              <div className="editor-section">
+                <SectionHeader sectionKey="awards" icon={<Star size={18} />} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 1rem', marginTop: '-0.5rem' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={addAward}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                <div className="editor-section-content">
+                  {resumeData.awards?.map((award) => (
+                    <div key={award.id} className="entry-card">
+                      <div className="entry-header">
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Award Title"
+                          value={award.title}
+                          onChange={(e) => updateAward(award.id, 'title', e.target.value)}
+                          style={{ fontWeight: '600', border: 'none', padding: 0, background: 'transparent' }}
+                        />
+                        <div className="entry-actions">
+                          <button
+                            className="entry-action-btn danger"
+                            onClick={() => removeAward(award.id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Issuing Organization"
+                          value={award.issuer}
+                          onChange={(e) => updateAward(award.id, 'issuer', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Year"
+                          value={award.year}
+                          onChange={(e) => updateAward(award.id, 'year', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {(!resumeData.awards || resumeData.awards.length === 0) && (
+                    <button className="btn btn-secondary" onClick={addAward} style={{ width: '100%' }}>
+                      <Plus size={18} />
+                      Add Award
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -2236,28 +2834,244 @@ function DashboardPage() {
   );
 }
 
+// Login/Register Page
+function LoginPage() {
+  const { login, register, loginWithGoogle, loginWithGithub, loading, user } = useAuth();
+  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) navigate('/dashboard');
+  }, [user, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    let result;
+    if (isLogin) {
+      result = await login(formData.email, formData.password);
+    } else {
+      result = await register(formData.name, formData.email, formData.password);
+    }
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    // Simulated Google login - in production, use real Google OAuth
+    const mockGoogleData = {
+      name: formData.name || 'Google User',
+      email: formData.email || 'user@gmail.com',
+      picture: 'https://ui-avatars.com/api/?name=Google+User&background=random'
+    };
+    const result = await loginWithGoogle(mockGoogleData);
+    if (result.success) navigate('/dashboard');
+    else setError(result.error);
+  };
+
+  const handleGithubLogin = async () => {
+    // Simulated GitHub login - in production, use real GitHub OAuth
+    const mockGithubData = {
+      name: formData.name || 'GitHub User',
+      email: formData.email || 'user@github.com',
+      avatar_url: 'https://ui-avatars.com/api/?name=GitHub+User&background=random'
+    };
+    const result = await loginWithGithub(mockGithubData);
+    if (result.success) navigate('/dashboard');
+    else setError(result.error);
+  };
+
+  return (
+    <div className="section" style={{ minHeight: 'calc(100vh - 200px)', display: 'flex', alignItems: 'center' }}>
+      <div className="container" style={{ maxWidth: '450px' }}>
+        <div className="card" style={{ padding: '2.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--primary-500), #8b5cf6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              <User size={28} style={{ color: 'white' }} />
+            </div>
+            <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>
+              {isLogin ? 'Welcome Back!' : 'Create Account'}
+            </h1>
+            <p style={{ color: 'var(--text-muted)' }}>
+              {isLogin ? 'Sign in to continue building your resume' : 'Start building professional resumes'}
+            </p>
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid var(--danger-500)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--danger-500)',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <AlertCircle size={18} />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            {!isLogin && (
+              <div className="input-group">
+                <label className="input-label">Full Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+            )}
+
+            <div className="input-group">
+              <label className="input-label">Email</label>
+              <input
+                type="email"
+                className="input"
+                placeholder="your@email.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Password</label>
+              <input
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                minLength={6}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '1rem' }}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }}></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <LogIn size={18} />
+                  {isLogin ? 'Sign In' : 'Create Account'}
+                </>
+              )}
+            </button>
+          </form>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            margin: '1.5rem 0',
+            color: 'var(--text-muted)'
+          }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+            <span style={{ fontSize: '0.875rem' }}>or continue with</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ flex: 1 }}
+              onClick={handleGoogleLogin}
+              disabled={loading}
+            >
+              <Chrome size={18} />
+              Google
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ flex: 1 }}
+              onClick={handleGithubLogin}
+              disabled={loading}
+            >
+              <Github size={18} />
+              GitHub
+            </button>
+          </div>
+
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)' }}>
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <button
+              type="button"
+              onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              style={{
+                color: 'var(--primary-500)',
+                fontWeight: '600',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {isLogin ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Main App Component
 function App() {
   return (
     <ThemeProvider>
-      <ResumeProvider>
-        <Router>
-          <div className="app">
-            <Navbar />
-            <main style={{ flex: 1 }}>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/builder" element={<BuilderPage />} />
-                <Route path="/templates" element={<TemplatesPage />} />
-                <Route path="/analyzer" element={<AnalyzerPage />} />
-                <Route path="/cover-letter" element={<CoverLetterPage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
-        </Router>
-      </ResumeProvider>
+      <AuthProvider>
+        <ResumeProvider>
+          <Router>
+            <div className="app">
+              <Navbar />
+              <main style={{ flex: 1 }}>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/builder" element={<BuilderPage />} />
+                  <Route path="/templates" element={<TemplatesPage />} />
+                  <Route path="/analyzer" element={<AnalyzerPage />} />
+                  <Route path="/cover-letter" element={<CoverLetterPage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Routes>
+              </main>
+              <Footer />
+            </div>
+          </Router>
+        </ResumeProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

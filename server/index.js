@@ -7,6 +7,9 @@ import mammoth from 'mammoth';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,23 +68,23 @@ const calculateATSScore = (resumeData) => {
   let contactScore = 0;
   if (resumeData.email) contactScore += 3;
   else feedback.push({ type: 'error', message: 'Email address is missing' });
-  
+
   if (resumeData.phone) contactScore += 3;
   else feedback.push({ type: 'warning', message: 'Phone number is missing' });
-  
+
   if (resumeData.linkedin) contactScore += 2;
   else feedback.push({ type: 'tip', message: 'Add LinkedIn profile URL' });
-  
+
   if (resumeData.location) contactScore += 2;
   else feedback.push({ type: 'tip', message: 'Add your location/city' });
-  
+
   sections.contact = { score: contactScore, max: 10, percentage: (contactScore / 10) * 100 };
   score += contactScore;
 
   // 2. Professional Summary (15 points)
   let summaryScore = 0;
   const summary = resumeData.summary || '';
-  
+
   if (summary.length >= 50) {
     summaryScore += 5;
     if (summary.length >= 150 && summary.length <= 300) {
@@ -93,7 +96,7 @@ const calculateATSScore = (resumeData) => {
       summaryScore += 2;
       feedback.push({ type: 'tip', message: 'Professional summary could be more detailed.' });
     }
-    
+
     // Check for keywords
     const keywordPatterns = /years|experience|professional|skilled|expertise|developed|managed|led/gi;
     const keywordMatches = summary.match(keywordPatterns);
@@ -106,30 +109,30 @@ const calculateATSScore = (resumeData) => {
   } else {
     feedback.push({ type: 'warning', message: 'Add a professional summary section.' });
   }
-  
+
   sections.summary = { score: summaryScore, max: 15, percentage: (summaryScore / 15) * 100 };
   score += summaryScore;
 
   // 3. Work Experience (25 points)
   let experienceScore = 0;
   const experience = resumeData.experience || [];
-  
+
   if (experience.length > 0) {
     experienceScore += 5;
-    
+
     // Check for action verbs
     const actionVerbs = /developed|managed|led|created|implemented|designed|achieved|increased|decreased|improved|analyzed|coordinated|supervised|trained|negotiated|launched|executed|delivered/gi;
-    
+
     experience.forEach((exp, index) => {
       const description = exp.description || '';
       const actionMatches = description.match(actionVerbs);
-      
+
       if (actionMatches && actionMatches.length >= 2) {
         experienceScore += 3;
       } else {
         feedback.push({ type: 'tip', message: `Use more action verbs in experience #${index + 1}` });
       }
-      
+
       // Check for quantifiable results
       const quantifiablePattern = /(\d+%|\d+\+|\$\d+|\d+ (years|months|people|team|projects))/gi;
       if (quantifiablePattern.test(description)) {
@@ -138,79 +141,79 @@ const calculateATSScore = (resumeData) => {
         feedback.push({ type: 'warning', message: `Add quantifiable achievements to experience #${index + 1}` });
       }
     });
-    
+
     // Cap at 25
     experienceScore = Math.min(experienceScore, 25);
   } else {
     feedback.push({ type: 'error', message: 'Work experience section is empty' });
   }
-  
+
   sections.experience = { score: experienceScore, max: 25, percentage: (experienceScore / 25) * 100 };
   score += experienceScore;
 
   // 4. Education (10 points)
   let educationScore = 0;
   const education = resumeData.education || [];
-  
+
   if (education.length > 0) {
     educationScore += 5;
-    
+
     education.forEach(edu => {
       if (edu.degree) educationScore += 2;
       if (edu.institution) educationScore += 2;
       if (edu.year) educationScore += 1;
     });
-    
+
     educationScore = Math.min(educationScore, 10);
   } else {
     feedback.push({ type: 'warning', message: 'Education section is missing' });
   }
-  
+
   sections.education = { score: educationScore, max: 10, percentage: (educationScore / 10) * 100 };
   score += educationScore;
 
   // 5. Skills (20 points)
   let skillsScore = 0;
   const skills = resumeData.skills || [];
-  
+
   if (skills.length > 0) {
     skillsScore += 5;
-    
+
     if (skills.length >= 5) skillsScore += 5;
     else if (skills.length >= 3) skillsScore += 3;
-    
+
     if (skills.length >= 10) skillsScore += 5;
     else if (skills.length >= 7) skillsScore += 3;
-    
+
     // Check for technical/soft skills balance
     const softSkills = ['communication', 'leadership', 'teamwork', 'problem-solving', 'time management', 'critical thinking'];
-    const hasSoftSkills = skills.some(skill => 
+    const hasSoftSkills = skills.some(skill =>
       softSkills.some(soft => skill.toLowerCase().includes(soft.toLowerCase()))
     );
-    
+
     if (hasSoftSkills) {
       skillsScore += 5;
     } else {
       feedback.push({ type: 'tip', message: 'Include soft skills like communication, leadership, teamwork.' });
     }
-    
+
     skillsScore = Math.min(skillsScore, 20);
   } else {
     feedback.push({ type: 'error', message: 'Skills section is missing' });
   }
-  
+
   sections.skills = { score: skillsScore, max: 20, percentage: (skillsScore / 20) * 100 };
   score += skillsScore;
 
   // 6. Formatting (10 points)
   let formattingScore = 10;
   const fullText = resumeData.rawText || '';
-  
+
   // Check for proper structure
   if (!fullText.includes('@') && !resumeData.email) {
     formattingScore -= 2;
   }
-  
+
   // Check length
   if (fullText.length < 300) {
     formattingScore -= 3;
@@ -219,7 +222,7 @@ const calculateATSScore = (resumeData) => {
     formattingScore -= 2;
     feedback.push({ type: 'tip', message: 'Resume might be too long. Keep it concise.' });
   }
-  
+
   formattingScore = Math.max(formattingScore, 0);
   sections.formatting = { score: formattingScore, max: 10, percentage: (formattingScore / 10) * 100 };
   score += formattingScore;
@@ -232,15 +235,15 @@ const calculateATSScore = (resumeData) => {
     'customer', 'client', 'stakeholder', 'budget', 'deadline',
     'technical', 'software', 'data', 'process', 'solution'
   ];
-  
-  const foundKeywords = industryKeywords.filter(keyword => 
+
+  const foundKeywords = industryKeywords.filter(keyword =>
     fullText.toLowerCase().includes(keyword.toLowerCase())
   );
-  
+
   keywordsScore = Math.min(Math.floor(foundKeywords.length * 0.8), 10);
-  sections.keywords = { 
-    score: keywordsScore, 
-    max: 10, 
+  sections.keywords = {
+    score: keywordsScore,
+    max: 10,
     percentage: (keywordsScore / 10) * 100,
     found: foundKeywords
   };
@@ -271,7 +274,7 @@ const getGrade = (score) => {
 
 const parseResumeText = (text) => {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-  
+
   const data = {
     rawText: text,
     name: '',
@@ -312,8 +315,8 @@ const parseResumeText = (text) => {
     'problem solving', 'teamwork', 'excel', 'powerpoint', 'word', 'photoshop',
     'figma', 'sketch', 'adobe', 'seo', 'marketing', 'sales', 'analysis'
   ];
-  
-  const foundSkills = skillKeywords.filter(skill => 
+
+  const foundSkills = skillKeywords.filter(skill =>
     text.toLowerCase().includes(skill.toLowerCase())
   );
   data.skills = [...new Set(foundSkills)];
@@ -394,7 +397,7 @@ app.post('/api/upload', upload.single('resume'), async (req, res) => {
 
     // Parse the resume text
     const resumeData = parseResumeText(text);
-    
+
     // Calculate ATS score
     const atsResult = calculateATSScore(resumeData);
 
@@ -428,7 +431,7 @@ app.post('/api/analyze', (req, res) => {
 app.post('/api/job-match', (req, res) => {
   try {
     const { resume, jobDescription } = req.body;
-    
+
     if (!resume || !jobDescription) {
       return res.status(400).json({ error: 'Resume and job description are required' });
     }
@@ -439,13 +442,13 @@ app.post('/api/job-match', (req, res) => {
     // Extract keywords from job description
     const words = jobText.match(/\b[a-z]+\b/g) || [];
     const keywords = [...new Set(words.filter(word => word.length > 3))];
-    
+
     // Calculate match
     const matchedKeywords = keywords.filter(keyword => resumeText.includes(keyword));
     const matchScore = Math.round((matchedKeywords.length / keywords.length) * 100);
 
     // Find missing important keywords
-    const importantKeywords = keywords.filter(keyword => 
+    const importantKeywords = keywords.filter(keyword =>
       jobText.split(keyword).length > 2 // appears more than once
     );
     const missingKeywords = importantKeywords.filter(keyword => !resumeText.includes(keyword));
@@ -466,7 +469,7 @@ app.post('/api/job-match', (req, res) => {
 // Skills database
 app.get('/api/skills/:category', (req, res) => {
   const { category } = req.params;
-  
+
   const skillsDatabase = {
     'software': [
       'JavaScript', 'Python', 'Java', 'C++', 'TypeScript', 'React', 'Node.js', 'Angular', 'Vue.js',
@@ -570,6 +573,562 @@ Sincerely,
   ];
 
   res.json({ success: true, templates });
+});
+
+// ============================================
+// AUTHENTICATION
+// ============================================
+
+const JWT_SECRET = process.env.JWT_SECRET || 'resume-builder-secret-key-2024';
+
+// In-memory user store (replace with database in production)
+const users = [];
+const userResumes = {};
+const resumeAnalytics = {};
+
+// Auth middleware
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Register
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Name, email and password are required' });
+    }
+
+    // Check if user exists
+    if (users.find(u => u.email === email)) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = {
+      id: uuidv4(),
+      name,
+      email,
+      password: hashedPassword,
+      provider: 'email',
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(user);
+    userResumes[user.id] = [];
+    resumeAnalytics[user.id] = { views: 0, downloads: 0, shares: 0 };
+
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, provider: user.provider }
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, provider: user.provider }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Google OAuth (simulated - in production use passport.js with Google strategy)
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { token: googleToken, name, email, picture } = req.body;
+
+    // Find or create user
+    let user = users.find(u => u.email === email);
+
+    if (!user) {
+      user = {
+        id: uuidv4(),
+        name,
+        email,
+        password: null,
+        provider: 'google',
+        picture,
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      userResumes[user.id] = [];
+      resumeAnalytics[user.id] = { views: 0, downloads: 0, shares: 0 };
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, provider: user.provider, picture: user.picture }
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({ error: 'Google authentication failed' });
+  }
+});
+
+// GitHub OAuth (simulated - in production use passport.js with GitHub strategy)
+app.post('/api/auth/github', async (req, res) => {
+  try {
+    const { code, name, email, avatar_url } = req.body;
+
+    // Find or create user
+    let user = users.find(u => u.email === email);
+
+    if (!user) {
+      user = {
+        id: uuidv4(),
+        name,
+        email: email || `github-${uuidv4()}@users.noreply.github.com`,
+        password: null,
+        provider: 'github',
+        picture: avatar_url,
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      userResumes[user.id] = [];
+      resumeAnalytics[user.id] = { views: 0, downloads: 0, shares: 0 };
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, provider: user.provider, picture: user.picture }
+    });
+  } catch (error) {
+    console.error('GitHub auth error:', error);
+    res.status(500).json({ error: 'GitHub authentication failed' });
+  }
+});
+
+// Get current user
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  const user = users.find(u => u.id === req.user.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  res.json({
+    success: true,
+    user: { id: user.id, name: user.name, email: user.email, provider: user.provider, picture: user.picture }
+  });
+});
+
+// ============================================
+// RESUME MANAGEMENT
+// ============================================
+
+// Save resume
+app.post('/api/resumes', authMiddleware, (req, res) => {
+  try {
+    const { resumeData, name } = req.body;
+    const resume = {
+      id: uuidv4(),
+      name: name || 'Untitled Resume',
+      data: resumeData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      views: 0,
+      downloads: 0
+    };
+
+    if (!userResumes[req.user.id]) {
+      userResumes[req.user.id] = [];
+    }
+    userResumes[req.user.id].push(resume);
+
+    res.json({ success: true, resume });
+  } catch (error) {
+    console.error('Save resume error:', error);
+    res.status(500).json({ error: 'Failed to save resume' });
+  }
+});
+
+// Get user resumes
+app.get('/api/resumes', authMiddleware, (req, res) => {
+  const resumes = userResumes[req.user.id] || [];
+  res.json({ success: true, resumes });
+});
+
+// Delete resume
+app.delete('/api/resumes/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!userResumes[req.user.id]) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+    userResumes[req.user.id] = userResumes[req.user.id].filter(r => r.id !== id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete resume' });
+  }
+});
+
+// ============================================
+// RESUME ANALYTICS
+// ============================================
+
+// Track resume view
+app.post('/api/analytics/view/:resumeId', (req, res) => {
+  try {
+    const { resumeId } = req.params;
+    // Find resume and increment views
+    for (const userId in userResumes) {
+      const resume = userResumes[userId].find(r => r.id === resumeId);
+      if (resume) {
+        resume.views = (resume.views || 0) + 1;
+        if (resumeAnalytics[userId]) {
+          resumeAnalytics[userId].views++;
+        }
+        return res.json({ success: true, views: resume.views });
+      }
+    }
+    res.status(404).json({ error: 'Resume not found' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to track view' });
+  }
+});
+
+// Track resume download
+app.post('/api/analytics/download/:resumeId', (req, res) => {
+  try {
+    const { resumeId } = req.params;
+    for (const userId in userResumes) {
+      const resume = userResumes[userId].find(r => r.id === resumeId);
+      if (resume) {
+        resume.downloads = (resume.downloads || 0) + 1;
+        if (resumeAnalytics[userId]) {
+          resumeAnalytics[userId].downloads++;
+        }
+        return res.json({ success: true, downloads: resume.downloads });
+      }
+    }
+    res.status(404).json({ error: 'Resume not found' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to track download' });
+  }
+});
+
+// Get analytics
+app.get('/api/analytics', authMiddleware, (req, res) => {
+  const analytics = resumeAnalytics[req.user.id] || { views: 0, downloads: 0, shares: 0 };
+  const resumes = userResumes[req.user.id] || [];
+
+  const totalViews = resumes.reduce((sum, r) => sum + (r.views || 0), 0);
+  const totalDownloads = resumes.reduce((sum, r) => sum + (r.downloads || 0), 0);
+
+  res.json({
+    success: true,
+    analytics: {
+      totalViews,
+      totalDownloads,
+      totalResumes: resumes.length,
+      resumeStats: resumes.map(r => ({
+        id: r.id,
+        name: r.name,
+        views: r.views || 0,
+        downloads: r.downloads || 0,
+        createdAt: r.createdAt
+      }))
+    }
+  });
+});
+
+// ============================================
+// WORD EXPORT
+// ============================================
+
+app.post('/api/export/word', async (req, res) => {
+  try {
+    const { resumeData } = req.body;
+
+    const sections = [];
+
+    // Header - Name
+    sections.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: resumeData.name || 'Your Name',
+            bold: true,
+            size: 48,
+            color: '2563eb'
+          })
+        ],
+        alignment: AlignmentType.CENTER
+      })
+    );
+
+    // Contact info
+    const contactParts = [];
+    if (resumeData.email) contactParts.push(resumeData.email);
+    if (resumeData.phone) contactParts.push(resumeData.phone);
+    if (resumeData.location) contactParts.push(resumeData.location);
+    if (resumeData.linkedin) contactParts.push(resumeData.linkedin);
+
+    if (contactParts.length > 0) {
+      sections.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: contactParts.join(' | '),
+              size: 22,
+              color: '666666'
+            })
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 300 }
+        })
+      );
+    }
+
+    // Professional Summary
+    if (resumeData.summary) {
+      sections.push(
+        new Paragraph({
+          text: 'PROFESSIONAL SUMMARY',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+      sections.push(
+        new Paragraph({
+          text: resumeData.summary,
+          spacing: { after: 200 }
+        })
+      );
+    }
+
+    // Experience
+    if (resumeData.experience?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'WORK EXPERIENCE',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+
+      resumeData.experience.forEach(exp => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: exp.title || 'Job Title', bold: true, size: 26 }),
+              new TextRun({ text: ` | ${exp.company || 'Company'}`, size: 24 })
+            ]
+          })
+        );
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: exp.duration || '', italics: true, size: 22, color: '666666' })
+            ],
+            spacing: { after: 100 }
+          })
+        );
+        if (exp.description) {
+          sections.push(
+            new Paragraph({
+              text: exp.description,
+              spacing: { after: 200 }
+            })
+          );
+        }
+      });
+    }
+
+    // Education
+    if (resumeData.education?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'EDUCATION',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+
+      resumeData.education.forEach(edu => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: edu.degree || 'Degree', bold: true, size: 26 }),
+              new TextRun({ text: ` | ${edu.institution || 'Institution'}`, size: 24 })
+            ]
+          })
+        );
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: edu.year || '', italics: true, size: 22, color: '666666' })
+            ],
+            spacing: { after: 200 }
+          })
+        );
+      });
+    }
+
+    // Skills
+    if (resumeData.skills?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'SKILLS',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+      sections.push(
+        new Paragraph({
+          text: resumeData.skills.join(' • '),
+          spacing: { after: 200 }
+        })
+      );
+    }
+
+    // Projects
+    if (resumeData.projects?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'PROJECTS',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+
+      resumeData.projects.forEach(proj => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: proj.name || 'Project Name', bold: true, size: 26 })
+            ]
+          })
+        );
+        if (proj.technologies) {
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Technologies: ${proj.technologies}`, italics: true, size: 22, color: '666666' })
+              ],
+              spacing: { after: 50 }
+            })
+          );
+        }
+        if (proj.description) {
+          sections.push(
+            new Paragraph({
+              text: proj.description,
+              spacing: { after: 200 }
+            })
+          );
+        }
+      });
+    }
+
+    // Certifications
+    if (resumeData.certifications?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'CERTIFICATIONS',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+
+      resumeData.certifications.forEach(cert => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: cert.name || 'Certification', bold: true }),
+              new TextRun({ text: ` - ${cert.issuer || 'Issuer'} (${cert.year || ''})`, size: 22 })
+            ],
+            spacing: { after: 100 }
+          })
+        );
+      });
+    }
+
+    // Languages
+    if (resumeData.languages?.length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'LANGUAGES',
+          heading: HeadingLevel.HEADING_2,
+          thematicBreak: true,
+          spacing: { before: 300, after: 100 }
+        })
+      );
+      sections.push(
+        new Paragraph({
+          text: resumeData.languages.map(l => `${l.name} (${l.level})`).join(' • '),
+          spacing: { after: 200 }
+        })
+      );
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: sections
+      }]
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${resumeData.name || 'resume'}.docx"`);
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('Word export error:', error);
+    res.status(500).json({ error: 'Failed to export Word document' });
+  }
 });
 
 // Start server
